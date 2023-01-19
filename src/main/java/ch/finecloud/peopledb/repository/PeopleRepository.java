@@ -1,5 +1,7 @@
 package ch.finecloud.peopledb.repository;
 
+import ch.finecloud.peopledb.annotation.SQL;
+import ch.finecloud.peopledb.model.CrudOperation;
 import ch.finecloud.peopledb.model.Person;
 
 import java.math.BigDecimal;
@@ -21,11 +23,7 @@ public class PeopleRepository extends CRUDRepository<Person> {
     }
 
     @Override
-    String getSaveSql() {
-        return SAVE_PERSON_SQL;
-    }
-
-    @Override
+    @SQL(value = SAVE_PERSON_SQL, operationType = CrudOperation.SAVE)
     void mapForSave(Person entity, PreparedStatement ps) throws SQLException {
         ps.setString(1, entity.getFirstName());
         ps.setString(2, entity.getLastName());
@@ -33,16 +31,7 @@ public class PeopleRepository extends CRUDRepository<Person> {
     }
 
     @Override
-    Person extractEntityFromResultSet(ResultSet rs) throws SQLException {
-        long personId = rs.getLong("ID");
-        String firstName = rs.getString("FIRST_NAME");
-        String lastName = rs.getString("LAST_NAME");
-        ZonedDateTime dob = ZonedDateTime.of(rs.getTimestamp("DOB").toLocalDateTime(), ZoneId.of("+0"));
-        BigDecimal salary = rs.getBigDecimal("SALARY");
-        return new Person(personId, firstName, lastName, dob, salary);
-    }
-
-    @Override
+    @SQL(value = UPDATE_SQL, operationType = CrudOperation.UPDATE)
     void mapForUpdate(Person entity, PreparedStatement ps) throws SQLException {
         ps.setString(1, entity.getFirstName());
         ps.setString(2, entity.getLastName());
@@ -51,33 +40,18 @@ public class PeopleRepository extends CRUDRepository<Person> {
     }
 
     @Override
-    protected String getFindByIdSql() {
-        return FIND_BY_ID_SQL;
-    }
-
-    @Override
-    protected String getFindAllSql() {
-        return FIND_ALL_SQL;
-    }
-
-    @Override
-    protected String getCountSql() {
-        return SELECT_COUNT_SQL;
-    }
-
-    @Override
-    protected String getDeleteSql() {
-        return DELETE_SQL;
-    }
-
-    @Override
-    protected String getDeleteInSql() {
-        return DELETE_IN_SQL;
-    }
-
-    @Override
-    protected String getUpdateSql() {
-        return UPDATE_SQL;
+    @SQL(value = FIND_BY_ID_SQL, operationType = CrudOperation.FIND_BY_ID)
+    @SQL(value = FIND_ALL_SQL, operationType = CrudOperation.FIND_ALL)
+    @SQL(value = SELECT_COUNT_SQL, operationType = CrudOperation.COUNT)
+    @SQL(value = DELETE_SQL, operationType = CrudOperation.DELETE_ONE)
+    @SQL(value = DELETE_IN_SQL, operationType = CrudOperation.DELETE_MANY)
+    Person extractEntityFromResultSet(ResultSet rs) throws SQLException {
+        long personId = rs.getLong("ID");
+        String firstName = rs.getString("FIRST_NAME");
+        String lastName = rs.getString("LAST_NAME");
+        ZonedDateTime dob = ZonedDateTime.of(rs.getTimestamp("DOB").toLocalDateTime(), ZoneId.of("+0"));
+        BigDecimal salary = rs.getBigDecimal("SALARY");
+        return new Person(personId, firstName, lastName, dob, salary);
     }
 
     private static Timestamp convertDobToTimestamp(ZonedDateTime dob) {
