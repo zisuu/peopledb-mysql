@@ -3,6 +3,7 @@ package ch.finecloud.peopledb.repository;
 import ch.finecloud.peopledb.annotation.SQL;
 import ch.finecloud.peopledb.model.Address;
 import ch.finecloud.peopledb.model.CrudOperation;
+import ch.finecloud.peopledb.model.Region;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -17,8 +18,23 @@ public class AddressRepository extends CRUDRepository<Address> {
     }
 
     @Override
+    @SQL(operationType = CrudOperation.FIND_BY_ID, value = """
+            SELECT ID, STREET_ADDRESS, ADDRESS2, CITY, STATE, POSTCODE, COUNTY, REGION, COUNTRY
+            FROM ADDRESSES
+            WHERE ID=?
+            """)
     Address extractEntityFromResultSet(ResultSet rs) throws SQLException {
-        return null;
+        long id = rs.getLong("ID");
+        String streetAddress = rs.getString("STREET_ADDRESS");
+        String address2 = rs.getString("ADDRESS2");
+        String city = rs.getString("CITY");
+        String state = rs.getString("STATE");
+        String postcode = rs.getString("POSTCODE");
+        String county = rs.getString("COUNTY");
+        Region region = Region.valueOf(rs.getString("REGION").toUpperCase());
+        String country = rs.getString("COUNTRY");
+        Address address = new Address(id, streetAddress, address2, city, state, postcode, county, country, region);
+        return address;
     }
 
     @Override

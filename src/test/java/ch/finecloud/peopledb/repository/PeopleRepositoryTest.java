@@ -64,6 +64,18 @@ public class PeopleRepositoryTest {
     }
 
     @Test
+    public void canFindPersonByIdWithAddress() throws SQLException {
+        Person personAddress = new Person("Peter", "Bmith", ZonedDateTime.of(1980, 11,15, 15, 15, 0, 0, ZoneId.of("-6")));
+        Address address = new Address(null, "123 TestStr", "Apt. 1a", "Bla Bla", "WA", "90210", "United States", "Fulton", Region.WEST);
+        personAddress.setHomeAddress(address);
+
+        Person savedPerson = repo.save(personAddress);
+        Person foundPerson = repo.findById(savedPerson.getId()).get();
+        assertThat(foundPerson.getHomeAddress().state()).isEqualTo("WA");
+//        connection.commit();
+    }
+
+    @Test
     public void canFindPersonById() {
         Person savedPerson = repo.save(new Person("Test", "Person", ZonedDateTime.of(2022, 11, 25, 18, 55, 17, 0, ZoneId.of("+0"))));
         Person foundPerson = repo.findById(savedPerson.getId()).get();
