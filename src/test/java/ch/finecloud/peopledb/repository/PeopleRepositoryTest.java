@@ -1,6 +1,8 @@
 package ch.finecloud.peopledb.repository;
 
+import ch.finecloud.peopledb.model.Address;
 import ch.finecloud.peopledb.model.Person;
+import ch.finecloud.peopledb.model.Region;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -9,8 +11,7 @@ import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
+import java.time.*;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -49,6 +50,17 @@ public class PeopleRepositoryTest {
         Person savedPerson1 = repo.save(person1);
         Person savedPerson2 = repo.save(person2);
         assertThat(savedPerson1.getId()).isNotEqualTo(savedPerson2.getId());
+    }
+
+    @Test
+    public void canSavePersonWithAddress() throws SQLException {
+        Person personAddress = new Person("Peter", "Bmith", ZonedDateTime.of(1980, 11,15, 15, 15, 0, 0, ZoneId.of("-6")));
+        Address address = new Address(null, "123 TestStr", "Apt. 1a", "Bla Bla", "WA", "90210", "United States", "Fulton", Region.WEST);
+        personAddress.setHomeAddress(address);
+
+        Person savedPerson = repo.save(personAddress);
+        assertThat(savedPerson.getHomeAddress().id()).isGreaterThan(0);
+//        connection.commit();
     }
 
     @Test
@@ -108,5 +120,25 @@ public class PeopleRepositoryTest {
         Person p2 = repo.findById(savedPerson.getId()).get();
         assertThat(p2.getSalary()).isNotEqualTo(p1.getSalary());
     }
+
+//    @Test
+//    public void loadData() throws IOException, SQLException {
+//        Files.lines(Path.of("/Users/Dave/Downloads/Hr5m.csv"))
+//                .skip(1)
+//                .limit(100)
+//                .map(l -> l.split(","))
+//                .map(a -> {
+//                    LocalDate dob = LocalDate.parse(a[14], DateTimeFormatter.ofPattern("M/d/yyyy"));
+//                    LocalTime tob = LocalTime.parse(a[11], DateTimeFormatter.ofPattern("hh:mm:ss a").localizedBy(Locale.ENGLISH));
+//                    LocalDateTime dtob = LocalDateTime.of(dob, tob);
+//                    ZonedDateTime zdtob = ZonedDateTime.of(dtob, ZoneId.of("+0"));
+//                    Person person = new Person(a[2], a[4], zdtob);
+//                    person.setSalary(new BigDecimal(a[25]));
+//                    person.setEmail(a[6]);
+//                    return person;
+//                })
+//                .forEach(repo::save);
+////        connection.commit();
+//    }
 
 }

@@ -1,6 +1,7 @@
 package ch.finecloud.peopledb.repository;
 
 import ch.finecloud.peopledb.annotation.SQL;
+import ch.finecloud.peopledb.model.Address;
 import ch.finecloud.peopledb.model.CrudOperation;
 import ch.finecloud.peopledb.model.Person;
 
@@ -10,7 +11,11 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 
 public class PeopleRepository extends CRUDRepository<Person> {
-    public static final String SAVE_PERSON_SQL = "INSERT INTO PEOPLE (FIRST_NAME, LAST_NAME, DOB) VALUES (?, ?, ?)";
+    private AddressRepository addressRepository = null;
+    public static final String SAVE_PERSON_SQL = """
+            INSERT INTO PEOPLE
+            (FIRST_NAME, LAST_NAME, DOB, SALARY, EMAIL, HOME_ADDRESS)
+            VALUES (?, ?, ?, ?, ?, ?)""";
     public static final String FIND_BY_ID_SQL = "SELECT ID, FIRST_NAME, LAST_NAME, DOB, SALARY FROM PEOPLE WHERE ID=?";
     public static final String FIND_ALL_SQL = "SELECT ID, FIRST_NAME, LAST_NAME, DOB, SALARY FROM PEOPLE";
     public static final String SELECT_COUNT_SQL = "SELECT COUNT(*) FROM PEOPLE";
@@ -20,14 +25,24 @@ public class PeopleRepository extends CRUDRepository<Person> {
 
     public PeopleRepository(Connection connection) {
         super(connection);
+        addressRepository = new AddressRepository(connection);
     }
 
     @Override
     @SQL(value = SAVE_PERSON_SQL, operationType = CrudOperation.SAVE)
     void mapForSave(Person entity, PreparedStatement ps) throws SQLException {
+        Address savedAddress = null;
         ps.setString(1, entity.getFirstName());
         ps.setString(2, entity.getLastName());
         ps.setTimestamp(3, convertDobToTimestamp(entity.getDob()));
+        ps.setBigDecimal(4, entity.getSalary());
+        ps.setString(5, entity.getEmail());
+        if (entity.getHomeAddress() != null) {
+            savedAddress = addressRepository.save(entity.getHomeAddress());
+            ps.setLong(6, savedAddress.id());
+        } else {
+            ps.setObject(6, null);
+        }
     }
 
     @Override
