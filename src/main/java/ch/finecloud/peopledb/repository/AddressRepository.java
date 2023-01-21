@@ -13,16 +13,35 @@ import java.sql.SQLException;
 public class AddressRepository extends CRUDRepository<Address> {
 
 
+    public static final String SAVE_ADDRESS_SQL = """
+            INSERT INTO ADDRESSES (STREET_ADDRESS, ADDRESS2, CITY, STATE, POSTCODE, COUNTY, REGION, COUNTRY)
+            VALUES(?, ?, ?, ?, ?, ?, ?, ?)
+            """;
+    public static final String FIND_ALL_SQL = """
+            SELECT ID, STREET_ADDRESS, ADDRESS2, CITY, STATE, POSTCODE, COUNTY, REGION, COUNTRY
+            FROM ADDRESSES
+            """;
+    public static final String FIND_BY_ID_SQL = """
+            SELECT ID, STREET_ADDRESS, ADDRESS2, CITY, STATE, POSTCODE, COUNTY, REGION, COUNTRY
+            FROM ADDRESSES
+            WHERE ID=?
+            """;
+    private static final String SELECT_COUNT_SQL = "SELECT COUNT(*) FROM ADDRESSES";
+    public static final String DELETE_SQL = "todo";
+    public static final String DELETE_IN_SQL = "todo";
+    public static final String UPDATE_SQL = "todo";
+
+
     public AddressRepository(Connection connection) {
         super(connection);
     }
 
     @Override
-    @SQL(operationType = CrudOperation.FIND_BY_ID, value = """
-            SELECT ID, STREET_ADDRESS, ADDRESS2, CITY, STATE, POSTCODE, COUNTY, REGION, COUNTRY
-            FROM ADDRESSES
-            WHERE ID=?
-            """)
+    @SQL(value = FIND_BY_ID_SQL, operationType = CrudOperation.FIND_BY_ID)
+    @SQL(value = FIND_ALL_SQL, operationType = CrudOperation.FIND_ALL)
+    @SQL(value = SELECT_COUNT_SQL, operationType = CrudOperation.COUNT)
+    @SQL(value = DELETE_SQL, operationType = CrudOperation.DELETE_ONE)
+    @SQL(value = DELETE_IN_SQL, operationType = CrudOperation.DELETE_MANY)
     Address extractEntityFromResultSet(ResultSet rs) throws SQLException {
         long id = rs.getLong("ID");
         String streetAddress = rs.getString("STREET_ADDRESS");
@@ -38,10 +57,7 @@ public class AddressRepository extends CRUDRepository<Address> {
     }
 
     @Override
-    @SQL(operationType = CrudOperation.SAVE, value = """
-            INSERT INTO ADDRESSES (STREET_ADDRESS, ADDRESS2, CITY, STATE, POSTCODE, COUNTY, REGION, COUNTRY)
-            VALUES(?, ?, ?, ?, ?, ?, ?, ?)
-            """)
+    @SQL(operationType = CrudOperation.SAVE, value = SAVE_ADDRESS_SQL)
     void mapForSave(Address entity, PreparedStatement ps) throws SQLException {
         ps.setString(1, entity.streetAddress());
         ps.setString(2, entity.address2());
@@ -55,7 +71,8 @@ public class AddressRepository extends CRUDRepository<Address> {
     }
 
     @Override
+    @SQL(value = UPDATE_SQL, operationType = CrudOperation.UPDATE)
     void mapForUpdate(Address entity, PreparedStatement ps) throws SQLException {
-
+        // todo
     }
 }

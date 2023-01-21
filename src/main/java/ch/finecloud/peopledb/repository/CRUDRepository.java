@@ -3,6 +3,7 @@ package ch.finecloud.peopledb.repository;
 import ch.finecloud.peopledb.annotation.Id;
 import ch.finecloud.peopledb.annotation.MultiSQL;
 import ch.finecloud.peopledb.annotation.SQL;
+import ch.finecloud.peopledb.exception.DataException;
 import ch.finecloud.peopledb.exception.UnableToSaveException;
 import ch.finecloud.peopledb.model.CrudOperation;
 
@@ -18,18 +19,34 @@ import java.util.stream.Stream;
 abstract class CRUDRepository<T> {
 
     protected Connection connection;
+    private PreparedStatement savePS;
+    private PreparedStatement findByIdPS;
+    private PreparedStatement findAllPS;
+    private PreparedStatement countPS;
+    private PreparedStatement deletePS;
+    private PreparedStatement updatePS;
+    private PreparedStatement deleteManyPS;
 
     public CRUDRepository(Connection connection) {
-        this.connection = connection;
+        try {
+            this.connection = connection;
+            savePS = connection.prepareStatement(getSqlByAnnotation(CrudOperation.SAVE, this::getSaveSql), Statement.RETURN_GENERATED_KEYS);
+            findByIdPS = connection.prepareStatement(getSqlByAnnotation(CrudOperation.FIND_BY_ID, this::getFindByIdSql));
+            findAllPS = connection.prepareStatement(getSqlByAnnotation(CrudOperation.FIND_ALL, this::getFindAllSql));
+            countPS = connection.prepareStatement(getSqlByAnnotation(CrudOperation.COUNT, this::getCountSql));
+            deletePS = connection.prepareStatement(getSqlByAnnotation(CrudOperation.DELETE_ONE, this::getDeleteSql));
+            updatePS = connection.prepareStatement(getSqlByAnnotation(CrudOperation.UPDATE, this::getUpdateSql));
+        } catch (SQLException e) {
+            throw new DataException("Unable to create prepared statement for CrudRepository", e);
+        }
     }
 
 
     public T save(T entity) throws UnableToSaveException {
         try {
-            PreparedStatement ps = connection.prepareStatement(getSqlByAnnotation(CrudOperation.SAVE, this::getSaveSql), Statement.RETURN_GENERATED_KEYS);
-            mapForSave(entity, ps);
-            int recordsAffected = ps.executeUpdate();
-            ResultSet rs = ps.getGeneratedKeys();
+            mapForSave(entity, savePS);
+            int recordsAffected = savePS.executeUpdate();
+            ResultSet rs = savePS.getGeneratedKeys();
             while (rs.next()) {
                 long id = rs.getLong(1);
                 setIdByAnnotation(id, entity);
@@ -37,8 +54,7 @@ abstract class CRUDRepository<T> {
             }
 //            System.out.printf("Records affected: %d%n", recordsAffected);
         } catch (SQLException e) {
-            e.printStackTrace();
-            throw new UnableToSaveException("Tried to save");
+            throw new DataException("Unable to create prepared statement for CrudRepository", e);
         }
         return entity;
     }
@@ -46,14 +62,13 @@ abstract class CRUDRepository<T> {
     public Optional<T> findById(Long id) {
         T entity = null;
         try {
-            PreparedStatement ps = connection.prepareStatement(getSqlByAnnotation(CrudOperation.FIND_BY_ID, this::getFindByIdSql));
-            ps.setLong(1, id);
-            ResultSet rs = ps.executeQuery();
+            findByIdPS.setLong(1, id);
+            ResultSet rs = findByIdPS.executeQuery();
             while (rs.next()) {
                 entity = extractEntityFromResultSet(rs);
             }
         } catch (SQLException e) {
-            throw new RuntimeException(e);
+            throw new DataException("Unable to create prepared statement for CrudRepository", e);
         }
         return Optional.ofNullable(entity);
     }
@@ -61,13 +76,12 @@ abstract class CRUDRepository<T> {
     public List<T> findAll() {
         List<T> entities = new ArrayList<>();
         try {
-            PreparedStatement ps = connection.prepareStatement(getSqlByAnnotation(CrudOperation.FIND_ALL, this::getFindAllSql));
-            ResultSet rs = ps.executeQuery();
+            ResultSet rs = findAllPS.executeQuery();
             while (rs.next()) {
                 entities.add(extractEntityFromResultSet(rs));
             }
         } catch (SQLException e) {
-            throw new RuntimeException(e);
+            throw new DataException("Unable to create prepared statement for CrudRepository", e);
         }
         return entities;
     }
@@ -75,24 +89,35 @@ abstract class CRUDRepository<T> {
     public Long count() {
         long count = 0;
         try {
-            PreparedStatement ps = connection.prepareStatement(getSqlByAnnotation(CrudOperation.COUNT, this::getCountSql));
-            ResultSet rs = ps.executeQuery();
+            ResultSet rs = countPS.executeQuery();
             if (rs.next()) {
                 count = rs.getLong(1);
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new DataException("Unable to create prepared statement for CrudRepository", e);
         }
         return count;
     }
 
+    // delete more one entity only
     public void delete(T entity) {
         try {
-            PreparedStatement ps = connection.prepareStatement(getSqlByAnnotation(CrudOperation.DELETE_ONE, this::getDeleteSql));
-            ps.setLong(1, getIdByAnnotation(entity));
-            int affectedRecordCount = ps.executeUpdate();
+            deletePS.setLong(1, getIdByAnnotation(entity));
+            int affectedRecordCount = deletePS.executeUpdate();
             System.out.println(affectedRecordCount);
         } catch (SQLException e) {
+            throw new DataException("Unable to create prepared statement for CrudRepository", e);
+        }
+    }
+
+    // delete more than one entity at a time
+    public void delete(T... entities) {
+        try {
+            String ids = Arrays.stream(entities).map(this::getIdByAnnotation).map(String::valueOf).collect(Collectors.joining(","));
+            deleteManyPS = connection.prepareStatement(getSqlByAnnotation(CrudOperation.DELETE_MANY, this::getDeleteInSql).replace(":ids", ids));
+            int affectedRecordCount = deleteManyPS.executeUpdate();
+            System.out.println(affectedRecordCount);
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }
@@ -118,7 +143,7 @@ abstract class CRUDRepository<T> {
                     f.setAccessible(true);
                     Long id = null;
                     try {
-                         id = (long) f.get(entity);
+                        id = (long) f.get(entity);
                     } catch (IllegalAccessException e) {
                         throw new RuntimeException(e);
                     }
@@ -127,26 +152,13 @@ abstract class CRUDRepository<T> {
                 .findFirst().orElseThrow(() -> new RuntimeException("No ID annotated field found")); // this should be replaced with a custom exception
     }
 
-    // delete more than one person at a time
-    public void delete(T... entities) {
-        try {
-            String ids = Arrays.stream(entities).map(this::getIdByAnnotation).map(String::valueOf).collect(Collectors.joining(","));
-            PreparedStatement ps = connection.prepareStatement(getSqlByAnnotation(CrudOperation.DELETE_MANY, this::getDeleteInSql).replace(":ids", ids));
-            int affectedRecordCount = ps.executeUpdate();
-            System.out.println(affectedRecordCount);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
     public void update(T entity) {
         try {
-            PreparedStatement ps = connection.prepareStatement(getSqlByAnnotation(CrudOperation.UPDATE, this::getUpdateSql));
-            mapForUpdate(entity, ps);
-            ps.setLong(5, getIdByAnnotation(entity));
-            ps.executeUpdate();
+            mapForUpdate(entity, updatePS);
+            updatePS.setLong(5, getIdByAnnotation(entity));
+            updatePS.executeUpdate();
         } catch (SQLException e) {
-            throw new RuntimeException(e);
+            throw new DataException("Unable to create prepared statement for CrudRepository", e);
         }
     }
 
@@ -172,23 +184,37 @@ abstract class CRUDRepository<T> {
      * "DELETE FROM PEOPLE WHERE ID IN (:ids)"
      * Be sure to include the '(:ids)' named parameter & call it 'ids'
      */
-    protected String getDeleteInSql() {throw new RuntimeException("SQL not defined");}
+    protected String getDeleteInSql() {
+        throw new RuntimeException("SQL not defined");
+    }
 
-    protected String getDeleteSql() {throw new RuntimeException("SQL not defined");}
+    protected String getDeleteSql() {
+        throw new RuntimeException("SQL not defined");
+    }
 
-    protected String getCountSql() {throw new RuntimeException("SQL not defined");}
+    protected String getCountSql() {
+        throw new RuntimeException("SQL not defined");
+    }
 
-    protected String getFindAllSql() {throw new RuntimeException("SQL not defined");}
+    protected String getFindAllSql() {
+        throw new RuntimeException("SQL not defined");
+    }
 
-    protected String getUpdateSql() {throw new RuntimeException("SQL not defined");}
+    protected String getUpdateSql() {
+        throw new RuntimeException("SQL not defined");
+    }
 
     /**
      * @return Returns a String that represents the SQL needed to retrieve one entity.
      * The SQL must contain one SQL parameter, i.e. "?", that will bind to the entity's ID.
      */
-    protected String getFindByIdSql() {throw new RuntimeException("SQL not defined");}
+    protected String getFindByIdSql() {
+        throw new RuntimeException("SQL not defined");
+    }
 
-    protected String getSaveSql() {throw new RuntimeException("SQL not defined");}
+    protected String getSaveSql() {
+        throw new RuntimeException("SQL not defined");
+    }
 
     abstract T extractEntityFromResultSet(ResultSet rs) throws SQLException;
 
