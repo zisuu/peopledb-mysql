@@ -38,8 +38,8 @@ public class PeopleRepository extends CRUDRepository<Person> {
         ps.setTimestamp(3, convertDobToTimestamp(entity.getDob()));
         ps.setBigDecimal(4, entity.getSalary());
         ps.setString(5, entity.getEmail());
-        if (entity.getHomeAddress() != null) {
-            savedAddress = addressRepository.save(entity.getHomeAddress());
+        if (entity.getHomeAddress().isPresent()) {
+            savedAddress = addressRepository.save(entity.getHomeAddress().get());
             ps.setLong(6, savedAddress.id());
         } else {
             ps.setObject(6, null);

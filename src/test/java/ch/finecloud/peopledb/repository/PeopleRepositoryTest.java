@@ -59,7 +59,7 @@ public class PeopleRepositoryTest {
         personAddress.setHomeAddress(address);
 
         Person savedPerson = repo.save(personAddress);
-        assertThat(savedPerson.getHomeAddress().id()).isGreaterThan(0);
+        assertThat(savedPerson.getHomeAddress().get().id()).isGreaterThan(0);
 //        connection.commit();
     }
 
@@ -71,7 +71,7 @@ public class PeopleRepositoryTest {
 
         Person savedPerson = repo.save(personAddress);
         Person foundPerson = repo.findById(savedPerson.getId()).get();
-        assertThat(foundPerson.getHomeAddress().state()).isEqualTo("WA");
+        assertThat(foundPerson.getHomeAddress().get().state()).isEqualTo("WA");
 //        connection.commit();
     }
 
